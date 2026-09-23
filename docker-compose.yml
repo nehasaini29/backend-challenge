@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: vehicles
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vehicles}
+      POSTGRES_DB: vehicles
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vehicles -d vehicles"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  api:
+    build: .
+    init: true
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://vehicles:${POSTGRES_PASSWORD:-vehicles}@db:5432/vehicles
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      INGEST_ON_STARTUP: ${INGEST_ON_STARTUP:-true}
+      INGEST_CONCURRENCY: ${INGEST_CONCURRENCY:-4}
+      NHTSA_BASE_URL: ${NHTSA_BASE_URL:-https://vpic.nhtsa.dot.gov/api/vehicles/}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      HTTP_TIMEOUT_MS: ${HTTP_TIMEOUT_MS:-15000}
+      HTTP_MAX_ATTEMPTS: ${HTTP_MAX_ATTEMPTS:-4}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-30000}
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    stop_grace_period: 35s
+    restart: unless-stopped
+volumes:
+  postgres_data:
